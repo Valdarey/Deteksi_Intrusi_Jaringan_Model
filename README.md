@@ -91,7 +91,6 @@ Dashboard mencakup:
 - Perbandingan metrik 3 model
 - Confusion matrix per model
 - Feature importance per model
-- Uji prediksi (sampel tunggal & batch CSV)
 - Unduh model terlatih (`model_nsl.pkl`)
 
 ---

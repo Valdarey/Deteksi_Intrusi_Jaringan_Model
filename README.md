@@ -46,7 +46,7 @@ Karena dataset memiliki label, pendekatan yang digunakan adalah **klasifikasi mu
 2. **Mapping label** — 23 label spesifik → 5 kategori serangan
 3. **Encoding fitur** — `OneHotEncoder` untuk 3 fitur kategorikal (`protocol_type`, `service`, `flag`), fitur numerik dilewatkan langsung (*passthrough*)
 4. **Split data** dengan `stratify` (80% latih, 20% uji) agar proporsi kelas minoritas tetap terjaga
-5. **Training & perbandingan 3 model**: Decision Tree, Random Forest (`class_weight='balanced'`), Gradient Boosting
+5. **Training & perbandingan 3 model**: Decision Tree, Random Forest, Gradient Boosting
 6. **Evaluasi** dengan Accuracy, F1-macro, dan **Recall-macro** sebagai metrik utama
 7. **Pemilihan model terbaik** berdasarkan recall macro tertinggi
 8. **Analisis feature importance** dan confusion matrix

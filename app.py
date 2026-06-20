@@ -77,11 +77,14 @@ def preprocess(df):
     missing = df.isnull().sum()
     duplicate = df.duplicated().sum()
 
+    # Simpan label asli untuk referensi
+    original_labels = df['label'].copy()
+    
     df = df.drop(columns=['difficulty'])
     df['attack_category'] = df['label'].map(ATTACK_MAPPING)
     df = df.drop(columns=['label'])
 
-    return df, missing, duplicate
+    return df, missing, duplicate, original_labels
 
 
 @st.cache_resource(show_spinner=False)
@@ -141,21 +144,39 @@ def train_all_models(df, test_size, random_state):
 
 
 @st.cache_data(show_spinner=False)
-def get_label_counts(df):
-    """Mendapatkan distribusi label"""
-    counts = df['attack_category'].value_counts().reindex(ORDERS)
+def get_label_counts(df, original_labels):
+    """Mendapatkan distribusi label dari data asli"""
+    # Gunakan original_labels yang disimpan
+    counts = original_labels.value_counts()
     return counts
 
 
 def fig_distribusi(counts):
+    fig, ax = plt.subplots(figsize=(8, 5))
+    bars = ax.bar(counts.index, counts.values, color=COLORS[:len(counts)])
+    ax.set_yscale('log')
+    for bar, val in zip(bars, counts.values):
+        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() * 1.1,
+                 f'{val:,}', ha='center', fontsize=9, fontweight='bold')
+    ax.set_title('Distribusi Serangan (Label Asli)')
+    ax.set_ylabel('Jumlah Serangan (skala log)')
+    ax.set_xlabel('Label Serangan')
+    plt.xticks(rotation=45, ha='right')
+    fig.tight_layout()
+    return fig
+
+
+def fig_distribusi_kategori(df):
+    """Distribusi per kategori serangan"""
+    counts = df['attack_category'].value_counts().reindex(ORDERS)
     fig, ax = plt.subplots(figsize=(8, 5))
     bars = ax.bar(counts.index, counts.values, color=COLORS)
     ax.set_yscale('log')
     for bar, val in zip(bars, counts.values):
         ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() * 1.1,
                  f'{val:,}', ha='center', fontsize=9, fontweight='bold')
-    ax.set_title('Distribusi Serangan')
-    ax.set_ylabel('Jumlah Serangan (skala log)')
+    ax.set_title('Distribusi Kategori Serangan')
+    ax.set_ylabel('Jumlah (skala log)')
     fig.tight_layout()
     return fig
 
@@ -219,7 +240,7 @@ def fig_flag_distribution(df):
     ax.set_title('Distribusi Flag')
     ax.set_ylabel('Jumlah')
     for bar, val in zip(bars, flag_counts.values):
-        if val > 1000:  # Hindari label terlalu padat
+        if val > 1000:
             ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() * 1.05,
                     f'{val:,}', ha='center', fontsize=8)
     fig.tight_layout()
@@ -230,7 +251,7 @@ def fig_flag_distribution(df):
 # LOAD DATA
 # =====================================================================
 raw_df = load_data()
-df, missing, duplicate = preprocess(raw_df)
+df, missing, duplicate, original_labels = preprocess(raw_df)
 
 # =====================================================================
 # SIDEBAR - Kontrol Dashboard
@@ -313,54 +334,77 @@ with tab_overview:
 # TAB 2: DISTRIBUSI SERANGAN
 # ---------------------------------------------------------------------
 with tab_dist:
-    counts = get_label_counts(df)
-    pct = (counts / counts.sum() * 100).round(2)
+    st.subheader("📊 Distribusi Kategori Serangan")
+    
+    # Kategori counts
+    category_counts = df['attack_category'].value_counts().reindex(ORDERS)
+    cat_pct = (category_counts / category_counts.sum() * 100).round(2)
     
     c1, c2 = st.columns([1.3, 1])
     with c1:
-        st.pyplot(fig_distribusi(counts))
+        st.pyplot(fig_distribusi_kategori(df))
     with c2:
-        st.subheader("Tabel Distribusi")
-        tabel = pd.DataFrame({
-            'Kategori': counts.index,
-            'Jumlah': counts.values,
-            'Persentase (%)': pct.values
+        st.subheader("Tabel Kategori")
+        tabel_cat = pd.DataFrame({
+            'Kategori': category_counts.index,
+            'Jumlah': category_counts.values,
+            'Persentase (%)': cat_pct.values
         })
-        st.dataframe(tabel, use_container_width=True, hide_index=True)
+        st.dataframe(tabel_cat, use_container_width=True, hide_index=True)
         st.info(
             "📌 Dataset NSL-KDD sangat **tidak seimbang** — kategori `U2R` dan `R2L` "
-            "jumlahnya jauh lebih kecil dibanding `normal`/`DoS`. Karena itu evaluasi "
-            "model di tab berikutnya menonjolkan **recall macro**, bukan hanya accuracy."
+            "jumlahnya jauh lebih kecil dibanding `normal`/`DoS`."
         )
     
     st.markdown("---")
-    st.subheader("📊 Distribusi Per Kategori Serangan (Detail)")
+    st.subheader("📊 Distribusi Label Asli (Detail)")
     
-    # Detail per label
-    label_detail = df['label'].value_counts()
+    # Gunakan original_labels untuk distribusi label asli
+    label_counts = original_labels.value_counts()
+    label_pct = (label_counts / label_counts.sum() * 100).round(2)
+    
+    c1, c2 = st.columns([1.3, 1])
+    with c1:
+        st.pyplot(fig_distribusi(label_counts))
+    with c2:
+        st.subheader("Tabel Label Asli")
+        tabel_label = pd.DataFrame({
+            'Label': label_counts.index,
+            'Jumlah': label_counts.values,
+            'Persentase (%)': label_pct.values
+        })
+        st.dataframe(tabel_label, use_container_width=True, hide_index=True)
+    
+    st.markdown("---")
+    st.subheader("📊 Detail Label per Kategori")
     
     # Filter by category
     categories = st.multiselect(
         "Pilih Kategori untuk Detail",
         options=ORDERS,
-        default=['DoS', 'normal']
+        default=['DoS', 'normal', 'Probe']
     )
     
     if categories:
+        # Filter original labels based on category
         filtered_labels = [k for k, v in ATTACK_MAPPING.items() if v in categories]
-        detail_counts = df[df['label'].isin(filtered_labels)]['label'].value_counts()
+        detail_mask = original_labels.isin(filtered_labels)
+        detail_counts = original_labels[detail_mask].value_counts()
         
-        fig, ax = plt.subplots(figsize=(8, 5))
-        bars = ax.bar(detail_counts.index, detail_counts.values, color='#636EFA')
-        ax.set_title('Detail Label per Kategori')
-        ax.set_ylabel('Jumlah')
-        ax.set_xlabel('Label')
-        for bar, val in zip(bars, detail_counts.values):
-            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() * 1.05,
-                    f'{val:,}', ha='center', fontsize=8)
-        plt.xticks(rotation=45, ha='right')
-        fig.tight_layout()
-        st.pyplot(fig)
+        if len(detail_counts) > 0:
+            fig, ax = plt.subplots(figsize=(8, 5))
+            bars = ax.bar(detail_counts.index, detail_counts.values, color='#636EFA')
+            ax.set_title('Detail Label per Kategori yang Dipilih')
+            ax.set_ylabel('Jumlah')
+            ax.set_xlabel('Label')
+            for bar, val in zip(bars, detail_counts.values):
+                ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() * 1.05,
+                        f'{val:,}', ha='center', fontsize=8)
+            plt.xticks(rotation=45, ha='right')
+            fig.tight_layout()
+            st.pyplot(fig)
+        else:
+            st.warning("Tidak ada label untuk kategori yang dipilih.")
 
 # ---------------------------------------------------------------------
 # LATIH MODEL (dipakai oleh beberapa tab di bawah)
@@ -535,7 +579,6 @@ with tab_predict:
             step=1
         )
         
-        # Tampilkan fitur penting
         sample = X_test.iloc[[idx]]
         
     with col2:

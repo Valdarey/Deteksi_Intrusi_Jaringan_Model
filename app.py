@@ -264,7 +264,7 @@ random_state = st.sidebar.number_input("random_state", value=42, step=1)
 st.sidebar.markdown("---")
 st.sidebar.caption(
     "Dashboard ini menggunakan dataset NSL-KDD yang sudah tersedia. "
-    "Data: 125.973 baris × 42 kolom."
+    "Data: 125.973 baris × 43 kolom."
 )
 
 st.sidebar.markdown("---")

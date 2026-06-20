@@ -21,7 +21,7 @@ from sklearn.metrics import (
 # =====================================================================
 st.set_page_config(
     page_title="Dashboard Deteksi Intrusi Jaringan - NSL-KDD",
-    page_icon="🛡️",
+    page_icon="",
     layout="wide",
 )
 
@@ -255,7 +255,7 @@ df, missing, duplicate, original_labels = preprocess(raw_df)
 # =====================================================================
 # SIDEBAR - Kontrol Dashboard
 # =====================================================================
-st.sidebar.title("🛡️ Kontrol Dashboard")
+st.sidebar.title("Kontrol Dashboard")
 st.sidebar.markdown("---")
 
 test_size = st.sidebar.slider("Proporsi data uji (test_size)", 0.1, 0.4, 0.2, 0.05)
@@ -268,42 +268,39 @@ st.sidebar.caption(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("📊 Statistik Cepat")
+st.sidebar.subheader("Statistik Cepat")
 st.sidebar.metric("Total Baris", f"{len(raw_df):,}")
 st.sidebar.metric("Tipe Serangan", raw_df['label'].nunique())
 st.sidebar.metric("Normal vs Attack", 
                   f"{len(df[df['attack_category']=='normal']):,} / {len(df[df['attack_category']!='normal']):,}")
 
 st.sidebar.markdown("---")
-st.sidebar.info("⏱️ **Pelatihan Model**")
+st.sidebar.info("**Pelatihan Model**")
 st.sidebar.caption(
     "Proses pelatihan 3 model (Decision Tree, Random Forest, Gradient Boosting) "
-    "memakan waktu sekitar **1-2 menit** tergantung spesifikasi server."
 )
 
 # =====================================================================
 # MAIN CONTENT
 # =====================================================================
-st.title("🛡️ Dashboard Deteksi Intrusi Jaringan — NSL-KDD")
+st.title("Dashboard Deteksi Intrusi Jaringan — NSL-KDD")
 st.caption(f"Data: NSL-KDD Train+ | {len(raw_df):,} baris × {raw_df.shape[1]} kolom")
 
 # Tampilkan informasi waktu pelatihan di awal
-st.info("⏱️ **Proses pelatihan model sedang berlangsung...**\n\n"
+st.info("⏱**Proses pelatihan model sedang berlangsung...**\n\n"
         "Pelatihan 3 model (Decision Tree, Random Forest, Gradient Boosting) "
-        "memakan waktu sekitar **1-2 menit**. Harap tunggu hingga selesai.\n\n"
-        "💡 *Hasil pelatihan akan di-cache sehingga tidak perlu dilatih ulang "
-        "saat navigasi tab.*")
+        "memakan waktu sekitar **1-2 menit**. Harap tunggu hingga selesai.\n\n")
 
 # =====================================================================
 # TABS
 # =====================================================================
 tab_overview, tab_dist, tab_model, tab_cm, tab_fi, tab_predict = st.tabs([
-    "📊 Ringkasan Data",
-    "📈 Distribusi Serangan",
-    "🤖 Perbandingan Model",
-    "🧩 Confusion Matrix",
-    "⭐ Feature Importance",
-    "🔍 Coba Prediksi",
+    "Ringkasan Data",
+    "Distribusi Serangan",
+    "Perbandingan Model",
+    "Confusion Matrix",
+    "Feature Importance",
+    "Coba Prediksi",
 ])
 
 # ---------------------------------------------------------------------
@@ -322,14 +319,14 @@ with tab_overview:
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("📊 Distribusi Protokol")
+        st.subheader("Distribusi Protokol")
         st.pyplot(fig_protocol_distribution(df))
     
     with col2:
-        st.subheader("📊 Distribusi Flag (Top)")
+        st.subheader("Distribusi Flag (Top)")
         st.pyplot(fig_flag_distribution(df))
     
-    st.subheader("📊 Top 10 Service")
+    st.subheader("Top 10 Service")
     st.pyplot(fig_service_top(df, 10))
     
     st.subheader("Pratinjau Data")
@@ -347,7 +344,7 @@ with tab_overview:
 # TAB 2: DISTRIBUSI SERANGAN
 # ---------------------------------------------------------------------
 with tab_dist:
-    st.subheader("📊 Distribusi Kategori Serangan")
+    st.subheader("Distribusi Kategori Serangan")
     
     # Kategori counts
     category_counts = df['attack_category'].value_counts().reindex(ORDERS)
@@ -365,12 +362,12 @@ with tab_dist:
         })
         st.dataframe(tabel_cat, use_container_width=True, hide_index=True)
         st.info(
-            "📌 Dataset NSL-KDD sangat **tidak seimbang** — kategori `U2R` dan `R2L` "
+            "Dataset NSL-KDD sangat **tidak seimbang** — kategori `U2R` dan `R2L` "
             "jumlahnya jauh lebih kecil dibanding `normal`/`DoS`."
         )
     
     st.markdown("---")
-    st.subheader("📊 Distribusi Label Asli (Detail)")
+    st.subheader("Distribusi Label Asli (Detail)")
     
     # Gunakan original_labels untuk distribusi label asli
     label_counts = original_labels.value_counts()
@@ -389,7 +386,7 @@ with tab_dist:
         st.dataframe(tabel_label, use_container_width=True, hide_index=True)
     
     st.markdown("---")
-    st.subheader("📊 Detail Label per Kategori")
+    st.subheader("Detail Label per Kategori")
     
     # Filter by category
     categories = st.multiselect(
@@ -422,7 +419,7 @@ with tab_dist:
 # ---------------------------------------------------------------------
 # LATIH MODEL (dipakai oleh beberapa tab di bawah)
 # ---------------------------------------------------------------------
-with st.spinner("⏳ Melatih model (Decision Tree, Random Forest, Gradient Boosting)...\n\n⏱️ Proses ini memakan waktu sekitar 1-2 menit..."):
+with st.spinner("Melatih model (Decision Tree, Random Forest, Gradient Boosting)...\n\n⏱️ Proses ini memakan waktu sekitar 1-2 menit..."):
     train_out = train_all_models(df, test_size, int(random_state))
 
 hasil = train_out['hasil']
@@ -437,15 +434,15 @@ numeric_cols = train_out['numeric_cols']
 # TAB 3: PERBANDINGAN MODEL
 # ---------------------------------------------------------------------
 with tab_model:
-    st.success("✅ Model berhasil dilatih!")
-    st.caption("⏱️ Waktu pelatihan: sekitar 1-2 menit (tergantung spesifikasi server)")
+    st.success("Model berhasil dilatih!")
+    st.caption("Waktu pelatihan: sekitar 1-2 menit (tergantung spesifikasi server)")
     
-    st.subheader("📊 Hasil Pembagian Data")
+    st.subheader("Hasil Pembagian Data")
     c1, c2 = st.columns(2)
     c1.metric("Jumlah Data Latih", f"{train_out['n_train']:,}")
     c2.metric("Jumlah Data Uji", f"{train_out['n_test']:,}")
 
-    st.subheader("📊 Perbandingan Metrik 3 Model")
+    st.subheader("Perbandingan Metrik 3 Model")
     metrik_df = pd.DataFrame({
         name: {
             'Accuracy': d['accuracy'],
@@ -460,9 +457,9 @@ with tab_model:
     )
 
     st.bar_chart(metrik_df)
-    st.success(f"🏆 Model terbaik berdasarkan **Recall macro** adalah **{model_terbaik}**")
+    st.success(f"Model terbaik berdasarkan **Recall macro** adalah **{model_terbaik}**")
     
-    with st.expander("📌 Penjelasan Metrik"):
+    with st.expander("Penjelasan Metrik"):
         st.markdown("""
         - **Accuracy**: Proporsi prediksi benar dari total prediksi
         - **F1-macro**: Rata-rata harmonik precision dan recall per kelas (tidak terbobot)
@@ -476,7 +473,7 @@ with tab_model:
 # TAB 4: CONFUSION MATRIX
 # ---------------------------------------------------------------------
 with tab_cm:
-    st.subheader("📊 Confusion Matrix Per Model")
+    st.subheader("Confusion Matrix Per Model")
     
     pilihan_model = st.selectbox(
         "Pilih model untuk dilihat confusion matrix-nya", 
@@ -493,7 +490,7 @@ with tab_cm:
     with c1:
         st.pyplot(fig_cm)
     with c2:
-        st.subheader("📊 Recall per Kategori")
+        st.subheader("Recall per Kategori")
         per_class_recall = cm.diagonal() / cm.sum(axis=1)
         recall_df = pd.DataFrame({
             'Kategori': le.classes_,
@@ -514,7 +511,7 @@ with tab_cm:
         st.pyplot(fig_recall)
     
     st.caption(
-        "📌 Kategori dengan recall paling rendah biasanya `U2R`/`R2L` karena "
+        "Kategori dengan recall paling rendah biasanya `U2R`/`R2L` karena "
         "jumlah sampelnya sangat sedikit di dataset."
     )
 
@@ -522,7 +519,7 @@ with tab_cm:
 # TAB 5: FEATURE IMPORTANCE
 # ---------------------------------------------------------------------
 with tab_fi:
-    st.subheader("⭐ Feature Importance per Model")
+    st.subheader("Feature Importance per Model")
     
     pilihan_model_fi = st.selectbox(
         "Pilih model untuk feature importance", 
@@ -554,7 +551,7 @@ with tab_fi:
                 }
             )
     
-    with st.expander("📌 Interpretasi Feature Importance"):
+    with st.expander("Interpretasi Feature Importance"):
         st.markdown("""
         Feature importance menunjukkan seberapa besar kontribusi setiap fitur dalam pengambilan keputusan model.
         
@@ -571,7 +568,7 @@ with tab_fi:
 # TAB 6: COBA PREDIKSI
 # ---------------------------------------------------------------------
 with tab_predict:
-    st.subheader("🔍 Uji Model dengan Data Uji")
+    st.subheader("Uji Model dengan Data Uji")
     
     pilihan_model_pred = st.selectbox(
         "Pilih model untuk prediksi", 

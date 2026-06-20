@@ -4,7 +4,7 @@ Project ini menggunakan **supervised learning (klasifikasi multi-kelas)** untuk 
 
 ## Live Demo
 
-🔗 **Live Demo:** [deteksiintrusijaringanmodel.streamlit.app](https://deteksiintrusijaringanmodel-g9xfatnn9rzgjfqshrswrs.streamlit.app/)
+🔗 **Live Demo:** [Kunjungi Dashboard](https://deteksiintrusijaringanmodel-g9xfatnn9rzgjfqshrswrs.streamlit.app/)
 
 ## Tentang Dataset
 

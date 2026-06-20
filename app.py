@@ -5,7 +5,6 @@ import pandas as pd
 import seaborn as sns
 import streamlit as st
 import matplotlib.pyplot as plt
-
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from sklearn.compose import make_column_transformer
 from sklearn.pipeline import Pipeline
@@ -20,7 +19,7 @@ from sklearn.metrics import (
 # KONFIGURASI HALAMAN
 # =====================================================================
 st.set_page_config(
-    page_title="Dashboard Deteksi Intrusi Jaringan - NSL-KDD",
+    page_title="Dashboard Deteksi Intrusi Jaringan",
     page_icon="",
     layout="wide",
 )
@@ -58,7 +57,7 @@ DEFAULT_DATA_PATH = "data/KDDTrain+.txt"
 
 
 # =====================================================================
-# FUNGSI BANTUAN (DI-CACHE AGAR TIDAK DIULANG SETIAP INTERAKSI)
+# FUNGSI BANTUAN (Cache)
 # =====================================================================
 @st.cache_data(show_spinner=False)
 def load_data():

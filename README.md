@@ -30,7 +30,7 @@ Menjawab pertanyaan: *"Apakah pola lalu lintas jaringan bisa digunakan untuk men
 - **R2L** (Remote to Local) — penyerang luar mencoba akses lokal
 - **U2R** (User to Root) — eskalasi dari pengguna biasa ke akses root
 
-Karena dataset memiliki label, pendekatan yang digunakan adalah **klasifikasi multi-kelas (supervised learning)** — bukan clustering.
+Karena dataset memiliki label, pendekatan yang digunakan adalah **klasifikasi multi-kelas (supervised learning)**
 
 ## Tools & Library
 

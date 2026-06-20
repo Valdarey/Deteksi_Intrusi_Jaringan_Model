@@ -146,7 +146,6 @@ def train_all_models(df, test_size, random_state):
 @st.cache_data(show_spinner=False)
 def get_label_counts(df, original_labels):
     """Mendapatkan distribusi label dari data asli"""
-    # Gunakan original_labels yang disimpan
     counts = original_labels.value_counts()
     return counts
 
@@ -275,11 +274,25 @@ st.sidebar.metric("Tipe Serangan", raw_df['label'].nunique())
 st.sidebar.metric("Normal vs Attack", 
                   f"{len(df[df['attack_category']=='normal']):,} / {len(df[df['attack_category']!='normal']):,}")
 
+st.sidebar.markdown("---")
+st.sidebar.info("⏱️ **Pelatihan Model**")
+st.sidebar.caption(
+    "Proses pelatihan 3 model (Decision Tree, Random Forest, Gradient Boosting) "
+    "memakan waktu sekitar **1-2 menit** tergantung spesifikasi server."
+)
+
 # =====================================================================
 # MAIN CONTENT
 # =====================================================================
 st.title("🛡️ Dashboard Deteksi Intrusi Jaringan — NSL-KDD")
 st.caption(f"Data: NSL-KDD Train+ | {len(raw_df):,} baris × {raw_df.shape[1]} kolom")
+
+# Tampilkan informasi waktu pelatihan di awal
+st.info("⏱️ **Proses pelatihan model sedang berlangsung...**\n\n"
+        "Pelatihan 3 model (Decision Tree, Random Forest, Gradient Boosting) "
+        "memakan waktu sekitar **1-2 menit**. Harap tunggu hingga selesai.\n\n"
+        "💡 *Hasil pelatihan akan di-cache sehingga tidak perlu dilatih ulang "
+        "saat navigasi tab.*")
 
 # =====================================================================
 # TABS
@@ -409,7 +422,7 @@ with tab_dist:
 # ---------------------------------------------------------------------
 # LATIH MODEL (dipakai oleh beberapa tab di bawah)
 # ---------------------------------------------------------------------
-with st.spinner("Melatih model (Decision Tree, Random Forest, Gradient Boosting)..."):
+with st.spinner("⏳ Melatih model (Decision Tree, Random Forest, Gradient Boosting)...\n\n⏱️ Proses ini memakan waktu sekitar 1-2 menit..."):
     train_out = train_all_models(df, test_size, int(random_state))
 
 hasil = train_out['hasil']
@@ -424,12 +437,15 @@ numeric_cols = train_out['numeric_cols']
 # TAB 3: PERBANDINGAN MODEL
 # ---------------------------------------------------------------------
 with tab_model:
-    st.subheader("Hasil Pembagian Data")
+    st.success("✅ Model berhasil dilatih!")
+    st.caption("⏱️ Waktu pelatihan: sekitar 1-2 menit (tergantung spesifikasi server)")
+    
+    st.subheader("📊 Hasil Pembagian Data")
     c1, c2 = st.columns(2)
     c1.metric("Jumlah Data Latih", f"{train_out['n_train']:,}")
     c2.metric("Jumlah Data Uji", f"{train_out['n_test']:,}")
 
-    st.subheader("Perbandingan Metrik 3 Model")
+    st.subheader("📊 Perbandingan Metrik 3 Model")
     metrik_df = pd.DataFrame({
         name: {
             'Accuracy': d['accuracy'],
@@ -600,54 +616,10 @@ with tab_predict:
         """, unsafe_allow_html=True)
     
     st.markdown("---")
-    with st.expander("📋 Lihat Detail Fitur Sampel"):
+    with st.expander("Lihat Detail Fitur Sampel"):
         sample_df = sample.T.rename(columns={sample.index[0]: 'nilai'})
         sample_df['nilai'] = sample_df['nilai'].apply(lambda x: f"{x:.4f}" if isinstance(x, float) else str(x))
         st.dataframe(sample_df, use_container_width=True, height=300)
-
-    st.markdown("---")
-    st.subheader("📊 Prediksi Massal dari File CSV")
-    st.caption(
-        "Upload file CSV berisi kolom-kolom fitur (tanpa kolom `label`/`attack_category`) "
-        "untuk diprediksi sekaligus menggunakan model terpilih."
-    )
-    
-    batch_file = st.file_uploader("Upload CSV untuk prediksi massal", type=["csv"], key="batch_predict")
-    if batch_file is not None:
-        try:
-            batch_df = pd.read_csv(batch_file)
-            
-            # Validasi kolom
-            required_cols = X_test.columns.tolist()
-            missing_cols = [col for col in required_cols if col not in batch_df.columns]
-            
-            if missing_cols:
-                st.warning(f"⚠️ Kolom berikut tidak ditemukan dalam file: {missing_cols[:5]}")
-                st.info("Pastikan file CSV memiliki kolom yang sesuai.")
-            else:
-                with st.spinner("Memprediksi..."):
-                    preds = pipe_terpilih.predict(batch_df)
-                    batch_df['prediksi_kategori'] = le.inverse_transform(preds)
-                    
-                    # Statistik prediksi
-                    pred_counts = batch_df['prediksi_kategori'].value_counts()
-                    
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        st.metric("Total Data Diprediksi", len(batch_df))
-                    with c2:
-                        st.metric("Kategori Unik", len(pred_counts))
-                    
-                    st.dataframe(batch_df, use_container_width=True)
-                    
-                    st.download_button(
-                        "⬇️ Unduh Hasil Prediksi (CSV)",
-                        data=batch_df.to_csv(index=False).encode('utf-8'),
-                        file_name="hasil_prediksi.csv",
-                        mime="text/csv"
-                    )
-        except Exception as e:
-            st.error(f"Gagal memproses file: {e}")
 
 # =====================================================================
 # FOOTER
@@ -669,13 +641,13 @@ st.markdown(
 # DOWNLOAD MODEL TERLATIH (di sidebar)
 # =====================================================================
 st.sidebar.markdown("---")
-st.sidebar.subheader("💾 Unduh Model")
+st.sidebar.subheader("Unduh Model")
 st.sidebar.caption(f"Model terbaik: {model_terbaik}")
 
 buffer = io.BytesIO()
 joblib.dump({'pipeline': hasil[model_terbaik]['pipeline'], 'label_encoder': le}, buffer)
 st.sidebar.download_button(
-    label=f"📥 Unduh model_nsl.pkl",
+    label=f"Unduh model_nsl.pkl",
     data=buffer.getvalue(),
     file_name="model_nsl.pkl",
     mime="application/octet-stream",

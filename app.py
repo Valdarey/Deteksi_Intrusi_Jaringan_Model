@@ -61,14 +61,14 @@ DEFAULT_DATA_PATH = "data/KDDTrain+.txt"
 # FUNGSI BANTUAN (DI-CACHE AGAR TIDAK DIULANG SETIAP INTERAKSI)
 # =====================================================================
 @st.cache_data(show_spinner=False)
-def load_data(file_bytes_or_path):
-    """Memuat dataset NSL-KDD mentah dan menambahkan nama kolom."""
-    if isinstance(file_bytes_or_path, (bytes, bytearray)):
-        buf = io.BytesIO(file_bytes_or_path)
-        df = pd.read_csv(buf, names=COLUMNS)
-    else:
-        df = pd.read_csv(file_bytes_or_path, names=COLUMNS)
-    return df
+def load_data():
+    """Memuat dataset NSL-KDD dari file lokal."""
+    try:
+        df = pd.read_csv(DEFAULT_DATA_PATH, names=COLUMNS)
+        return df
+    except FileNotFoundError:
+        st.error("Dataset tidak ditemukan! Pastikan file 'KDDTrain+.txt' ada di folder 'data/'")
+        st.stop()
 
 
 @st.cache_data(show_spinner=False)
@@ -85,7 +85,7 @@ def preprocess(df):
 
 
 @st.cache_resource(show_spinner=False)
-def train_all_models(df_hash_key, df, test_size, random_state):
+def train_all_models(df, test_size, random_state):
     """Melatih 3 model dan mengembalikan hasil evaluasi + objek terlatih."""
     X = df.drop(columns=['attack_category'])
     y = df['attack_category']
@@ -140,6 +140,13 @@ def train_all_models(df_hash_key, df, test_size, random_state):
     }
 
 
+@st.cache_data(show_spinner=False)
+def get_label_counts(df):
+    """Mendapatkan distribusi label"""
+    counts = df['attack_category'].value_counts().reindex(ORDERS)
+    return counts
+
+
 def fig_distribusi(counts):
     fig, ax = plt.subplots(figsize=(8, 5))
     bars = ax.bar(counts.index, counts.values, color=COLORS)
@@ -179,49 +186,79 @@ def fig_feature_importance(pipeline, nominal_cols, numeric_cols, top_n=15):
     return fig, fi_df
 
 
+def fig_protocol_distribution(df):
+    """Visualisasi distribusi protokol"""
+    fig, ax = plt.subplots(figsize=(6, 4))
+    protocol_counts = df['protocol_type'].value_counts()
+    ax.pie(protocol_counts.values, labels=protocol_counts.index, autopct='%1.1f%%', 
+           colors=['#3B82F6', '#EF4444', '#10B981'], startangle=90)
+    ax.set_title('Distribusi Protokol')
+    fig.tight_layout()
+    return fig
+
+
+def fig_service_top(df, top_n=10):
+    """Visualisasi top service"""
+    fig, ax = plt.subplots(figsize=(8, 5))
+    service_counts = df['service'].value_counts().head(top_n)
+    bars = ax.barh(service_counts.index, service_counts.values, color='#636EFA')
+    ax.set_title(f'Top {top_n} Service')
+    ax.set_xlabel('Jumlah')
+    for bar, val in zip(bars, service_counts.values):
+        ax.text(val, bar.get_y() + bar.get_height()/2, f'{val:,}', 
+                va='center', ha='left', fontsize=9)
+    fig.tight_layout()
+    return fig
+
+
+def fig_flag_distribution(df):
+    """Visualisasi distribusi flag"""
+    fig, ax = plt.subplots(figsize=(7, 4))
+    flag_counts = df['flag'].value_counts()
+    bars = ax.bar(flag_counts.index, flag_counts.values, color='#F59E0B')
+    ax.set_title('Distribusi Flag')
+    ax.set_ylabel('Jumlah')
+    for bar, val in zip(bars, flag_counts.values):
+        if val > 1000:  # Hindari label terlalu padat
+            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() * 1.05,
+                    f'{val:,}', ha='center', fontsize=8)
+    fig.tight_layout()
+    return fig
+
+
 # =====================================================================
-# SIDEBAR
+# LOAD DATA
+# =====================================================================
+raw_df = load_data()
+df, missing, duplicate = preprocess(raw_df)
+
+# =====================================================================
+# SIDEBAR - Kontrol Dashboard
 # =====================================================================
 st.sidebar.title("🛡️ Kontrol Dashboard")
-
-uploaded = st.sidebar.file_uploader(
-    "Upload dataset NSL-KDD (.txt / .csv tanpa header)",
-    type=["txt", "csv"],
-    help="Jika tidak upload, app akan mencoba memakai file di data/KDDTrain+.txt"
-)
+st.sidebar.markdown("---")
 
 test_size = st.sidebar.slider("Proporsi data uji (test_size)", 0.1, 0.4, 0.2, 0.05)
 random_state = st.sidebar.number_input("random_state", value=42, step=1)
 
 st.sidebar.markdown("---")
 st.sidebar.caption(
-    "Dashboard ini melatih ulang 3 model (Decision Tree, Random Forest, "
-    "Gradient Boosting) langsung di dalam app menggunakan pipeline yang sama "
-    "dengan skrip `model.py` aslinya."
+    "Dashboard ini menggunakan dataset NSL-KDD yang sudah tersedia. "
+    "Data: 125.973 baris × 42 kolom."
 )
 
-# =====================================================================
-# LOAD DATA
-# =====================================================================
-try:
-    if uploaded is not None:
-        raw_df = load_data(uploaded.getvalue())
-        sumber = uploaded.name
-    else:
-        raw_df = load_data(DEFAULT_DATA_PATH)
-        sumber = DEFAULT_DATA_PATH
-except FileNotFoundError:
-    st.error(
-        "Dataset belum tersedia. Silakan upload file NSL-KDD (mis. `KDDTrain+.txt`) "
-        "lewat sidebar, atau letakkan file tersebut di folder `data/KDDTrain+.txt` "
-        "pada repo sebelum deploy ke Streamlit."
-    )
-    st.stop()
+st.sidebar.markdown("---")
+st.sidebar.subheader("📊 Statistik Cepat")
+st.sidebar.metric("Total Baris", f"{len(raw_df):,}")
+st.sidebar.metric("Tipe Serangan", raw_df['label'].nunique())
+st.sidebar.metric("Normal vs Attack", 
+                  f"{len(df[df['attack_category']=='normal']):,} / {len(df[df['attack_category']!='normal']):,}")
 
-df, missing, duplicate = preprocess(raw_df)
-
+# =====================================================================
+# MAIN CONTENT
+# =====================================================================
 st.title("🛡️ Dashboard Deteksi Intrusi Jaringan — NSL-KDD")
-st.caption(f"Sumber data: `{sumber}` | {len(raw_df):,} baris × {raw_df.shape[1]} kolom")
+st.caption(f"Data: NSL-KDD Train+ | {len(raw_df):,} baris × {raw_df.shape[1]} kolom")
 
 # =====================================================================
 # TABS
@@ -241,32 +278,44 @@ tab_overview, tab_dist, tab_model, tab_cm, tab_fi, tab_predict = st.tabs([
 with tab_overview:
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total Baris", f"{len(raw_df):,}")
-    col2.metric("Total Kolom (mentah)", raw_df.shape[1])
+    col2.metric("Total Kolom", raw_df.shape[1])
     col3.metric("Missing Value", int(missing.sum()))
     col4.metric("Baris Duplikat", int(duplicate))
-
+    
+    st.markdown("---")
+    
+    # Visualisasi ringkasan
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("📊 Distribusi Protokol")
+        st.pyplot(fig_protocol_distribution(df))
+    
+    with col2:
+        st.subheader("📊 Distribusi Flag (Top)")
+        st.pyplot(fig_flag_distribution(df))
+    
+    st.subheader("📊 Top 10 Service")
+    st.pyplot(fig_service_top(df, 10))
+    
     st.subheader("Pratinjau Data")
-    st.dataframe(raw_df.head(20), use_container_width=True)
-
-    st.subheader("Tipe Data per Kolom")
-    dtype_df = pd.DataFrame({
-        'kolom': raw_df.columns,
-        'dtype': raw_df.dtypes.astype(str),
-        'missing': raw_df.isnull().sum().values,
-    })
-    st.dataframe(dtype_df, use_container_width=True, height=300)
-
-    with st.expander("Lihat detail missing value per kolom"):
-        st.dataframe(missing[missing > 0] if missing.sum() > 0 else
-                     pd.Series({'info': 'Tidak ada missing value 🎉'}))
+    st.dataframe(raw_df.head(10), use_container_width=True)
+    
+    with st.expander("Lihat Tipe Data per Kolom"):
+        dtype_df = pd.DataFrame({
+            'kolom': raw_df.columns,
+            'dtype': raw_df.dtypes.astype(str),
+            'missing': raw_df.isnull().sum().values,
+        })
+        st.dataframe(dtype_df, use_container_width=True, height=300)
 
 # ---------------------------------------------------------------------
 # TAB 2: DISTRIBUSI SERANGAN
 # ---------------------------------------------------------------------
 with tab_dist:
-    counts = df['attack_category'].value_counts().reindex(ORDERS)
+    counts = get_label_counts(df)
     pct = (counts / counts.sum() * 100).round(2)
-
+    
     c1, c2 = st.columns([1.3, 1])
     with c1:
         st.pyplot(fig_distribusi(counts))
@@ -279,16 +328,45 @@ with tab_dist:
         })
         st.dataframe(tabel, use_container_width=True, hide_index=True)
         st.info(
-            "Dataset NSL-KDD sangat **tidak seimbang** — kategori `U2R` dan `R2L` "
+            "📌 Dataset NSL-KDD sangat **tidak seimbang** — kategori `U2R` dan `R2L` "
             "jumlahnya jauh lebih kecil dibanding `normal`/`DoS`. Karena itu evaluasi "
             "model di tab berikutnya menonjolkan **recall macro**, bukan hanya accuracy."
         )
+    
+    st.markdown("---")
+    st.subheader("📊 Distribusi Per Kategori Serangan (Detail)")
+    
+    # Detail per label
+    label_detail = df['label'].value_counts()
+    
+    # Filter by category
+    categories = st.multiselect(
+        "Pilih Kategori untuk Detail",
+        options=ORDERS,
+        default=['DoS', 'normal']
+    )
+    
+    if categories:
+        filtered_labels = [k for k, v in ATTACK_MAPPING.items() if v in categories]
+        detail_counts = df[df['label'].isin(filtered_labels)]['label'].value_counts()
+        
+        fig, ax = plt.subplots(figsize=(8, 5))
+        bars = ax.bar(detail_counts.index, detail_counts.values, color='#636EFA')
+        ax.set_title('Detail Label per Kategori')
+        ax.set_ylabel('Jumlah')
+        ax.set_xlabel('Label')
+        for bar, val in zip(bars, detail_counts.values):
+            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() * 1.05,
+                    f'{val:,}', ha='center', fontsize=8)
+        plt.xticks(rotation=45, ha='right')
+        fig.tight_layout()
+        st.pyplot(fig)
 
 # ---------------------------------------------------------------------
 # LATIH MODEL (dipakai oleh beberapa tab di bawah)
 # ---------------------------------------------------------------------
 with st.spinner("Melatih model (Decision Tree, Random Forest, Gradient Boosting)..."):
-    train_out = train_all_models(len(df), df, test_size, int(random_state))
+    train_out = train_all_models(df, test_size, int(random_state))
 
 hasil = train_out['hasil']
 model_terbaik = train_out['model_terbaik']
@@ -315,54 +393,89 @@ with tab_model:
             'Recall-macro': d['recall'],
         } for name, d in hasil.items()
     }).T.round(4)
+    
     st.dataframe(
         metrik_df.style.highlight_max(axis=0, color='#16a34a33'),
         use_container_width=True
     )
 
     st.bar_chart(metrik_df)
-
     st.success(f"🏆 Model terbaik berdasarkan **Recall macro** adalah **{model_terbaik}**")
+    
+    with st.expander("📌 Penjelasan Metrik"):
+        st.markdown("""
+        - **Accuracy**: Proporsi prediksi benar dari total prediksi
+        - **F1-macro**: Rata-rata harmonik precision dan recall per kelas (tidak terbobot)
+        - **Recall-macro**: Rata-rata recall per kelas (tidak terbobot)
+        
+        Recall-macro dipilih sebagai metrik utama karena dataset tidak seimbang.
+        Model dengan recall tinggi berarti mampu mendeteksi serangan dengan baik.
+        """)
 
 # ---------------------------------------------------------------------
 # TAB 4: CONFUSION MATRIX
 # ---------------------------------------------------------------------
 with tab_cm:
-    pilihan_model = st.selectbox("Pilih model untuk dilihat confusion matrix-nya", list(hasil.keys()),
-                                  index=list(hasil.keys()).index(model_terbaik))
+    st.subheader("📊 Confusion Matrix Per Model")
+    
+    pilihan_model = st.selectbox(
+        "Pilih model untuk dilihat confusion matrix-nya", 
+        list(hasil.keys()),
+        index=list(hasil.keys()).index(model_terbaik)
+    )
     data_model = hasil[pilihan_model]
     fig_cm, cm = fig_confusion(
         y_test, data_model['pred'], le.classes_,
         f"{pilihan_model} | Acc={data_model['accuracy']:.2%} | Recall={data_model['recall']:.2%}"
     )
+    
     c1, c2 = st.columns([1, 1])
     with c1:
         st.pyplot(fig_cm)
     with c2:
-        st.subheader("Recall per Kategori")
+        st.subheader("📊 Recall per Kategori")
         per_class_recall = cm.diagonal() / cm.sum(axis=1)
         recall_df = pd.DataFrame({
             'Kategori': le.classes_,
             'Recall': per_class_recall
-        }).sort_values('Recall')
-        st.dataframe(recall_df.style.format({'Recall': '{:.2%}'}), use_container_width=True, hide_index=True)
-        st.caption(
-            "Kategori dengan recall paling rendah biasanya `U2R`/`R2L` karena "
-            "jumlah sampelnya sangat sedikit di dataset."
-        )
+        }).sort_values('Recall', ascending=False)
+        st.dataframe(recall_df.style.format({'Recall': '{:.2%}'}), 
+                     use_container_width=True, hide_index=True)
+        
+        # Visualisasi recall
+        fig_recall, ax = plt.subplots(figsize=(5, 3))
+        colors_recall = ['#10B981' if r >= 0.8 else '#F59E0B' if r >= 0.5 else '#EF4444' 
+                         for r in per_class_recall]
+        ax.barh(le.classes_, per_class_recall, color=colors_recall)
+        ax.set_title('Recall per Kategori')
+        ax.set_xlabel('Recall')
+        ax.set_xlim(0, 1)
+        fig_recall.tight_layout()
+        st.pyplot(fig_recall)
+    
+    st.caption(
+        "📌 Kategori dengan recall paling rendah biasanya `U2R`/`R2L` karena "
+        "jumlah sampelnya sangat sedikit di dataset."
+    )
 
 # ---------------------------------------------------------------------
 # TAB 5: FEATURE IMPORTANCE
 # ---------------------------------------------------------------------
 with tab_fi:
+    st.subheader("⭐ Feature Importance per Model")
+    
     pilihan_model_fi = st.selectbox(
-        "Pilih model untuk feature importance", list(hasil.keys()),
-        index=list(hasil.keys()).index(model_terbaik), key="fi_select"
+        "Pilih model untuk feature importance", 
+        list(hasil.keys()),
+        index=list(hasil.keys()).index(model_terbaik), 
+        key="fi_select"
     )
-    top_n = st.slider("Jumlah fitur teratas ditampilkan", 5, 25, 15)
+    top_n = st.slider("Jumlah fitur teratas", 5, 25, 15)
+    
     fig_fi, fi_df = fig_feature_importance(
         hasil[pilihan_model_fi]['pipeline'], nominal_cols, numeric_cols, top_n
     )
+    
     if fig_fi is None:
         st.warning(f"Model **{pilihan_model_fi}** tidak memiliki atribut `feature_importances_`.")
     else:
@@ -370,67 +483,160 @@ with tab_fi:
         with c1:
             st.pyplot(fig_fi)
         with c2:
-            st.dataframe(fi_df.reset_index(drop=True), use_container_width=True, hide_index=True)
+            st.subheader("Top Fitur")
+            st.dataframe(
+                fi_df.reset_index(drop=True), 
+                use_container_width=True, 
+                hide_index=True,
+                column_config={
+                    "fitur": "Fitur",
+                    "kepentingan": "Kepentingan"
+                }
+            )
+    
+    with st.expander("📌 Interpretasi Feature Importance"):
+        st.markdown("""
+        Feature importance menunjukkan seberapa besar kontribusi setiap fitur dalam pengambilan keputusan model.
+        
+        **Fitur penting yang umum ditemukan:**
+        - `dst_host_same_srv_rate`: Tingkat keberhasilan layanan yang sama pada host tujuan
+        - `dst_host_srv_count`: Jumlah koneksi ke layanan yang sama pada host tujuan
+        - `count`: Jumlah koneksi ke host yang sama dalam 2 detik
+        - `srv_count`: Jumlah koneksi ke layanan yang sama dalam 2 detik
+        
+        Fitur-fitur ini biasanya paling berpengaruh dalam membedakan serangan DoS dari lalu lintas normal.
+        """)
 
 # ---------------------------------------------------------------------
 # TAB 6: COBA PREDIKSI
 # ---------------------------------------------------------------------
 with tab_predict:
-    st.subheader("Uji Model dengan Sampel dari Data Uji")
+    st.subheader("🔍 Uji Model dengan Data Uji")
+    
     pilihan_model_pred = st.selectbox(
-        "Pilih model untuk prediksi", list(hasil.keys()),
-        index=list(hasil.keys()).index(model_terbaik), key="pred_select"
+        "Pilih model untuk prediksi", 
+        list(hasil.keys()),
+        index=list(hasil.keys()).index(model_terbaik), 
+        key="pred_select"
     )
     pipe_terpilih = hasil[pilihan_model_pred]['pipeline']
 
-    idx = st.number_input(
-        "Pilih indeks baris dari data uji (0 s.d. {})".format(len(X_test) - 1),
-        min_value=0, max_value=len(X_test) - 1, value=0, step=1
-    )
-    sample = X_test.iloc[[idx]]
-    actual_label = le.inverse_transform([y_test[idx]])[0]
-    pred_label = le.inverse_transform(pipe_terpilih.predict(sample))[0]
-
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Label Sebenarnya", actual_label)
-    c2.metric("Prediksi Model", pred_label)
-    c3.metric("Status", "✅ Benar" if actual_label == pred_label else "❌ Salah")
-
-    with st.expander("Lihat detail fitur baris ini"):
-        st.dataframe(sample.T.rename(columns={sample.index[0]: 'nilai'}), use_container_width=True)
+    st.markdown("---")
+    
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.subheader("Pilih Sampel")
+        idx = st.number_input(
+            "Indeks baris (0 s.d. {})".format(len(X_test) - 1),
+            min_value=0, 
+            max_value=len(X_test) - 1, 
+            value=0, 
+            step=1
+        )
+        
+        # Tampilkan fitur penting
+        sample = X_test.iloc[[idx]]
+        
+    with col2:
+        st.subheader("Hasil Prediksi")
+        
+        actual_label = le.inverse_transform([y_test[idx]])[0]
+        pred_label = le.inverse_transform(pipe_terpilih.predict(sample))[0]
+        
+        # Warna berdasarkan status
+        status = "✅ Benar" if actual_label == pred_label else "❌ Salah"
+        status_color = "green" if actual_label == pred_label else "red"
+        
+        st.markdown(f"""
+        <div style='padding: 20px; border-radius: 10px; background-color: #f8f9fa;'>
+            <h4 style='color: #1f2937;'>🔹 Label Sebenarnya: <span style='color: #3B82F6;'>{actual_label}</span></h4>
+            <h4 style='color: #1f2937;'>🔸 Prediksi Model: <span style='color: #3B82F6;'>{pred_label}</span></h4>
+            <h3 style='color: {status_color};'>{status}</h3>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    with st.expander("📋 Lihat Detail Fitur Sampel"):
+        sample_df = sample.T.rename(columns={sample.index[0]: 'nilai'})
+        sample_df['nilai'] = sample_df['nilai'].apply(lambda x: f"{x:.4f}" if isinstance(x, float) else str(x))
+        st.dataframe(sample_df, use_container_width=True, height=300)
 
     st.markdown("---")
-    st.subheader("Prediksi Massal dari File CSV")
+    st.subheader("📊 Prediksi Massal dari File CSV")
     st.caption(
         "Upload file CSV berisi kolom-kolom fitur (tanpa kolom `label`/`attack_category`) "
-        "untuk diprediksi sekaligus menggunakan model terpilih di atas."
+        "untuk diprediksi sekaligus menggunakan model terpilih."
     )
+    
     batch_file = st.file_uploader("Upload CSV untuk prediksi massal", type=["csv"], key="batch_predict")
     if batch_file is not None:
         try:
             batch_df = pd.read_csv(batch_file)
-            preds = pipe_terpilih.predict(batch_df)
-            batch_df['prediksi_kategori'] = le.inverse_transform(preds)
-            st.dataframe(batch_df, use_container_width=True)
-            st.download_button(
-                "⬇️ Unduh Hasil Prediksi (CSV)",
-                data=batch_df.to_csv(index=False).encode('utf-8'),
-                file_name="hasil_prediksi.csv",
-                mime="text/csv"
-            )
+            
+            # Validasi kolom
+            required_cols = X_test.columns.tolist()
+            missing_cols = [col for col in required_cols if col not in batch_df.columns]
+            
+            if missing_cols:
+                st.warning(f"⚠️ Kolom berikut tidak ditemukan dalam file: {missing_cols[:5]}")
+                st.info("Pastikan file CSV memiliki kolom yang sesuai.")
+            else:
+                with st.spinner("Memprediksi..."):
+                    preds = pipe_terpilih.predict(batch_df)
+                    batch_df['prediksi_kategori'] = le.inverse_transform(preds)
+                    
+                    # Statistik prediksi
+                    pred_counts = batch_df['prediksi_kategori'].value_counts()
+                    
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        st.metric("Total Data Diprediksi", len(batch_df))
+                    with c2:
+                        st.metric("Kategori Unik", len(pred_counts))
+                    
+                    st.dataframe(batch_df, use_container_width=True)
+                    
+                    st.download_button(
+                        "⬇️ Unduh Hasil Prediksi (CSV)",
+                        data=batch_df.to_csv(index=False).encode('utf-8'),
+                        file_name="hasil_prediksi.csv",
+                        mime="text/csv"
+                    )
         except Exception as e:
             st.error(f"Gagal memproses file: {e}")
 
 # =====================================================================
-# DOWNLOAD MODEL TERLATIH
+# FOOTER
+# =====================================================================
+st.markdown("---")
+st.markdown(
+    """
+    <div style='text-align: center; color: #6b7280; padding: 20px;'>
+        <p style='font-size: 14px;'>
+            Dashboard Deteksi Intrusi Jaringan — NSL-KDD<br>
+            Dibangun dengan Streamlit &amp; Scikit-learn
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+# =====================================================================
+# DOWNLOAD MODEL TERLATIH (di sidebar)
 # =====================================================================
 st.sidebar.markdown("---")
 st.sidebar.subheader("💾 Unduh Model")
+st.sidebar.caption(f"Model terbaik: {model_terbaik}")
+
 buffer = io.BytesIO()
 joblib.dump({'pipeline': hasil[model_terbaik]['pipeline'], 'label_encoder': le}, buffer)
 st.sidebar.download_button(
-    label=f"Unduh model_nsl.pkl ({model_terbaik})",
+    label=f"📥 Unduh model_nsl.pkl",
     data=buffer.getvalue(),
     file_name="model_nsl.pkl",
     mime="application/octet-stream",
 )
+
+st.sidebar.markdown("---")
+st.sidebar.caption("Versi 1.0 | © 2024")

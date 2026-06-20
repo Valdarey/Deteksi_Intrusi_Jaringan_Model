@@ -2,9 +2,9 @@
 
 Project ini menggunakan **supervised learning (klasifikasi multi-kelas)** untuk mendeteksi dan mengklasifikasikan jenis serangan pada lalu lintas jaringan menggunakan dataset **NSL-KDD**.
 
-## Dashboard Preview
+## Live Demo
 
-![Dashboard Preview](https://deteksiintrusijaringanmodel-g9xfatnn9rzgjfqshrswrs.streamlit.app/)
+🔗 **Live Demo:** [deteksiintrusijaringanmodel.streamlit.app](https://deteksiintrusijaringanmodel-g9xfatnn9rzgjfqshrswrs.streamlit.app/)
 
 ## Tentang Dataset
 
